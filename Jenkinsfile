@@ -1,0 +1,99 @@
+pipeline {
+
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "likithus/student-ecommerce"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build \
+                        -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
+                        -t ${DOCKER_IMAGE}:latest .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login \
+                            -u "$DOCKER_USER" \
+                            --password-stdin
+
+                        docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    docker compose down || true
+                    docker compose pull
+                    docker compose up -d
+                '''
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                sh '''
+                    echo "Waiting for application to start..."
+
+                    sleep 30
+
+                    curl -f http://localhost:8085/ || exit 1
+                '''
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo '===================================='
+            echo 'Student Ecommerce Deployment Successful'
+            echo '===================================='
+        }
+
+        failure {
+            echo '===================================='
+            echo 'Pipeline Failed'
+            echo '===================================='
+        }
+
+        always {
+            cleanWs()
+        }
+    }
+}

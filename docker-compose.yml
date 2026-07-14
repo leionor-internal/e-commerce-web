@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: student-ecommerce-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: student_ecommerce_db
+      MYSQL_USER: student
+      MYSQL_PASSWORD: student123
+      MYSQL_ROOT_PASSWORD: root123
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - student-ecommerce-data:/var/lib/mysql
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - student-network
+
+  app:
+    image: likithus/student-ecommerce:latest
+    container_name: student-ecommerce-app
+
+    restart: unless-stopped
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/student_ecommerce_db
+      SPRING_DATASOURCE_USERNAME: student
+      SPRING_DATASOURCE_PASSWORD: student123
+      SERVER_PORT: 8085
+
+    ports:
+      - "8085:8085"
+
+    networks:
+      - student-network
+
+volumes:
+  student-ecommerce-data:
+
+networks:
+  student-network:
+    driver: bridge
