@@ -23,7 +23,7 @@ WORKDIR /app
 RUN groupadd -r studentapp && useradd -r -g studentapp studentapp
 
 # Copy generated JAR
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app/target/student-ecommerce.jar app.jar
 
 RUN chown studentapp:studentapp app.jar
 
